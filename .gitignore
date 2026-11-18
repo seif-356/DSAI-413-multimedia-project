@@ -1,0 +1,10 @@
+__pycache__/
+.ipynb_checkpoints/
+*.avi
+*.mp4
+*.wav
+*.rar
+*.zip
+*.npy
+data/
+features/
