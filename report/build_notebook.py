@@ -122,8 +122,9 @@ if s2:
     para(f"Classes ({len(s2['classes'])}): {', '.join(s2['classes'])}. Clips — train: {s2.get('n_train','?')}, "
          f"validation: {s2.get('n_val','?')}, test: {s2['n_test']}.")
     if 'speech_fraction' in s2:
-        para(f"Clips with detectable speech: {pct(s2['speech_fraction'])}. The remaining clips have no transcript, "
-             'which limits the text modality.')
+        para(f"Clips with a non-empty Whisper transcript: {pct(s2['speech_fraction'])}. This overstates real speech: on music or "
+             'background noise Whisper often produces short hallucinated text (e.g. "them", "Cockroaches"), so many transcripts '
+             'carry little or misleading information about the activity.')
 doc.add_heading('2. Features and model', 2)
 para('Video (FV): ResNet-50 features of 8 uniformly sampled RGB frames + ResNet-50 features of Farneback optical-flow images '
      '(HSV-encoded), averaged over time (4096-d). Audio (FA): 40 MFCC + Δ + ΔΔ and spectral centroid, bandwidth, roll-off, flatness, '
@@ -144,8 +145,10 @@ if s2:
     if 'ablation_f1' in s2:
         para('Drop-one-modality ablation (macro-F1): ' + ', '.join(f'{k}: {v:.4f}' for k, v in s2['ablation_f1'].items()))
 doc.add_heading('Limitations', 3)
-para('Transcripts are machine-generated and most activity clips contain little speech; frozen ImageNet CNN features; '
-     'a subset of UCF101 classes with audio.')
+para('Transcripts are machine-generated and partly hallucinated. The 10 classes (the first 10 alphabetically among the '
+     'audio-bearing candidates) are mostly grooming/household activities whose soundtrack is music or narration rather than the '
+     'sound of the action, which explains the weak audio branch; sound-producing classes (e.g. musical instruments) would test '
+     'audio fusion more fairly. Frozen ImageNet CNN features; video dominates the fused vector (4096 of ~5000 dimensions).')
 
 doc.save(OUT); print('Report written to', OUT)
 """)
