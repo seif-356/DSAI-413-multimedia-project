@@ -1,6 +1,7 @@
 # Assignment — Projects at Lecture 6 (transcribed from the course PDF)
 
-Page images: `page1.jpg`, `page2.jpg`, `page3.jpg`. Each project: 12 marks, due **25-11-2026**, teams of two students.
+Page images: `page1.jpg`, `page2.jpg`, `page3.jpg`. Original PDF: each project 12 marks, due 25-11-2026. **Updated PDF (uploaded later): 6 marks each, 28-11-2026.**
+**Moodle (binding): "Project (Two Tasks)" — 10 marks, due Wed 25 Nov 2026 12:00 AM, 1 attempt.** Confirm with the instructor which deadline applies; submit by the Moodle one.
 
 ## Project 1 — Multimodal Alzheimer's Disease Classification Using MRI and Clinical Text
 Select a multimodal dataset; combine two modalities aligned from the **same patients**. Recommended: **ADNI** (brain MRI scans + clinical/cognitive assessment records).

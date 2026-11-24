@@ -59,7 +59,7 @@ N_CLASSES     = 10      # final number of classes kept
 N_FRAMES      = 8       # frames sampled uniformly per clip
 IMG_SIZE      = 224
 SR            = 16000   # audio sample rate
-WHISPER_MODEL = 'small' # 'base' is faster, 'small' more accurate
+WHISPER_MODEL = 'base'  # 'base' is fast enough for the deadline; 'small' is more accurate
 MIN_AUDIO_FRAC = 0.95   # class kept only if >=95% of its clips have audio
 
 # Candidate classes: everyday / sound-producing activities. The final list is chosen from data (audio availability).
@@ -77,9 +77,9 @@ code(r"""
 # 3) Download UCF101 (~6.5 GB) + official splits  (one-time; stored on Drive)
 os.chdir(DATA)
 if not os.path.exists('UCF101.rar'):
-    !wget -q --show-progress https://www.crcv.ucf.edu/data/UCF101/UCF101.rar
+    !wget -q --show-progress https://www.crcv.ucf.edu/data/UCF101/UCF101.rar || wget -q --show-progress --no-check-certificate https://www.crcv.ucf.edu/data/UCF101/UCF101.rar
 if not os.path.exists('ucfTrainTestlist'):
-    !wget -q https://www.crcv.ucf.edu/data/UCF101/UCF101TrainTestSplits-RecognitionTask.zip
+    !wget -q https://www.crcv.ucf.edu/data/UCF101/UCF101TrainTestSplits-RecognitionTask.zip || wget -q --no-check-certificate https://www.crcv.ucf.edu/data/UCF101/UCF101TrainTestSplits-RecognitionTask.zip
     !unzip -q -o UCF101TrainTestSplits-RecognitionTask.zip
 # Extract only candidate classes, to local disk (faster than Drive I/O)
 VID_DIR = '/content/UCF-101'
@@ -430,7 +430,9 @@ abl = {k: results.loc[n, '_f1'] for k, n in [('full', 'Fusion [FV, FA, FT] (BERT
                                              ('− audio', 'Video + Text (BERT)'), ('− video', 'Audio + Text (BERT)')]}
 display(pd.Series(abl, name='macro-F1').to_frame())
 json.dump({'classes': CLASSES, 'best_single': best_single, 'fusion': fusion, 'gain_f1': gain,
-           'mcnemar_p': p, 'n_test': int(len(y_test))}, open(f'{RES}/summary.json', 'w'), indent=2)
+           'mcnemar_p': p, 'n_test': int(len(y_test)), 'n_train': int(len(idx['train'])), 'n_val': int(len(idx['val'])),
+           'speech_fraction': float((df.text != '[nospeech]').mean()), 'n_fixed': n10, 'n_broken': n01,
+           'ablation_f1': abl}, open(f'{RES}/summary.json', 'w'), indent=2)
 """)
 
 nb = nbf.v4.new_notebook(cells=cells)
