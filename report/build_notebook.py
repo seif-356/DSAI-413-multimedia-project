@@ -12,7 +12,7 @@ writes `MyDrive/DSAI413_Report.docx`. Edit the names and links in the first cell
 """)
 
 code(r"""
-TEAM        = ['Student 1 name — ID', 'Student 2 name — ID']        # <-- EDIT
+TEAM        = ['Student name — ID']                                 # <-- EDIT (one entry if individual)
 DRIVE_LINK1 = 'https://drive.google.com/...  (MM_Project1/dataset)'  # <-- EDIT: share link of the dataset folder
 DRIVE_LINK2 = 'https://drive.google.com/...  (MM_Project2/data)'     # <-- EDIT
 
@@ -60,7 +60,7 @@ def image(path, w=6.5):
 def pct(x): return f'{100*x:.1f}%'
 
 doc.add_heading('DSAI 413 — Multimedia Project (Two Tasks)', 0)
-para('Team: ' + '; '.join(TEAM))
+para(('Student: ' if len(TEAM) == 1 else 'Team: ') + '; '.join(TEAM))
 para('Code: Project1_Multimodal_Alzheimer.ipynb, Project2_Multimodal_HAR.ipynb (outputs included in the notebooks).')
 para(f'Datasets (Google Drive): Project 1 — {DRIVE_LINK1}; Project 2 — {DRIVE_LINK2}')
 
