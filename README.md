@@ -10,6 +10,16 @@ Assignment spec: `assignment/ASSIGNMENT.md`. History: `HISTORY.md`.
 
 Run 1 and 2 in parallel in two Colab tabs if your account allows two GPU sessions.
 
+## Run on a Mac (Apple silicon) instead
+Outputs go to `~/DSAI413/` instead of Drive; upload the dataset folders to Drive afterwards.
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+git clone -b claude/festive-hypatia-wn53pf https://github.com/seif-356/DSAI-413-multimedia-project.git ~/DSAI413-code
+cd ~/DSAI413-code && uv venv --seed --python 3.12 && source .venv/bin/activate
+uv pip install jupyterlab torch torchvision transformers openai-whisper librosa opencv-python-headless scikit-learn scipy pandas seaborn tqdm kagglehub python-docx imageio-ffmpeg
+jupyter lab
+```
+
 ## Submit
 1. Both notebooks **with outputs** (File → Download .ipynb after running).
 2. Google Drive share links: `MyDrive/MM_Project1/dataset` and `MyDrive/MM_Project2/data`.

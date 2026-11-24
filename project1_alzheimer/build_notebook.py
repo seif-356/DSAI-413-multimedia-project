@@ -27,31 +27,32 @@ md(r"""
 **Evaluation protocol:** patient-level stratified 5-fold cross-validation (one scan per patient, so no patient appears in both train and test). Every model is evaluated on **exactly the same patient-level test folds**, × 3 seeds.
 Metrics: accuracy, balanced accuracy, macro precision/recall/F1, Cohen's κ, macro ROC-AUC, confusion matrices, McNemar's test (fusion vs best single modality).
 
-> Run on **Google Colab with a GPU** (Runtime → Change runtime type → T4 GPU) → Runtime → Run all.
+> Runs on **Google Colab** (T4 GPU; outputs on Drive) **or a Mac** (Apple GPU; outputs in `~/DSAI413/MM_Project1`). Run all cells.
 """)
 
 code(r"""
-# 1) Setup
-!pip -q install kagglehub
+# 1) Setup — works on Google Colab (CUDA) and on a Mac (Apple-silicon GPU via MPS)
+%pip -q install kagglehub seaborn transformers
 
-import os, re, glob, json, random, shutil, warnings
+import os, sys, re, glob, json, random, shutil, warnings
 import numpy as np, pandas as pd
 import torch, torch.nn as nn
 import matplotlib.pyplot as plt, seaborn as sns
 from PIL import Image
 from tqdm.auto import tqdm
+from IPython.display import display
 warnings.filterwarnings('ignore')
 
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-print('Device:', DEVICE)
+IN_COLAB = 'google.colab' in sys.modules
+DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
+print('Device:', DEVICE, '| Colab:', IN_COLAB)
 
-USE_DRIVE = True
-if USE_DRIVE:
+if IN_COLAB:
     from google.colab import drive
     drive.mount('/content/drive')
     ROOT = '/content/drive/MyDrive/MM_Project1'
 else:
-    ROOT = '/content/MM_Project1'
+    ROOT = os.path.expanduser('~/DSAI413/MM_Project1')
 FEAT, RES, DSET = f'{ROOT}/features', f'{ROOT}/results', f'{ROOT}/dataset'
 for d in (FEAT, RES, DSET): os.makedirs(d, exist_ok=True)
 """)
@@ -170,7 +171,7 @@ for _, r in tqdm(df.iterrows(), total=len(df), desc='copy dataset'):
         if not os.path.exists(dst): shutil.copy(p, dst)
 df.assign(slices=df.slices.map(lambda s: ';'.join(os.path.basename(p) for p in s))) \
   .to_csv(f'{DSET}/aligned_patients.csv', index=False)
-print('Dataset saved to', DSET, '-> share this Drive folder.')
+print('Dataset saved to', DSET, '-> upload/share this folder on Google Drive.')
 """)
 
 md("## 6) MRI branch — CNN + ViT feature extraction → `FI`")

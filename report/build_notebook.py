@@ -16,14 +16,17 @@ TEAM        = ['Student 1 name — ID', 'Student 2 name — ID']        # <-- ED
 DRIVE_LINK1 = 'https://drive.google.com/...  (MM_Project1/dataset)'  # <-- EDIT: share link of the dataset folder
 DRIVE_LINK2 = 'https://drive.google.com/...  (MM_Project2/data)'     # <-- EDIT
 
-!pip -q install python-docx
-import os, json, pandas as pd
+%pip -q install python-docx
+import os, sys, json, pandas as pd
 from docx import Document
 from docx.shared import Pt, Inches
-from google.colab import drive
-drive.mount('/content/drive')
-R1, R2 = '/content/drive/MyDrive/MM_Project1/results', '/content/drive/MyDrive/MM_Project2/results'
-OUT = '/content/drive/MyDrive/DSAI413_Report.docx'
+if 'google.colab' in sys.modules:
+    from google.colab import drive
+    drive.mount('/content/drive'); BASE = '/content/drive/MyDrive'
+else:
+    BASE = os.path.expanduser('~/DSAI413')
+R1, R2 = f'{BASE}/MM_Project1/results', f'{BASE}/MM_Project2/results'
+OUT = f'{BASE}/DSAI413_Report.docx'
 """)
 
 code(r"""

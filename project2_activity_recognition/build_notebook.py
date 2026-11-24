@@ -23,33 +23,35 @@ We keep only classes whose clips actually contain an audio stream (checked with 
 Validation is carved from the training groups. **Every model is tested on the same test clips.**
 Metrics: Accuracy, macro Precision / Recall / F1, Cohen's κ, confusion matrices. Mean ± std over 3 seeds, plus McNemar's test for *fusion vs best single modality*.
 
-> Run on **Google Colab with a GPU** (Runtime → Change runtime type → T4 GPU). Features are cached to Google Drive, so a disconnect does not lose work.
+> Runs on **Google Colab** (T4 GPU; outputs on Drive) **or a Mac** (Apple GPU; outputs in `~/DSAI413/MM_Project2`). Features are cached, so an interruption does not lose work.
 """)
 
 code(r"""
-# 1) Setup
-!pip -q install openai-whisper
-!apt-get -qq install -y unrar ffmpeg > /dev/null
+# 1) Setup — works on Google Colab (CUDA) and on a Mac (Apple-silicon GPU via MPS)
+%pip -q install openai-whisper imageio-ffmpeg librosa opencv-python-headless seaborn transformers
 
-import os, re, json, glob, random, subprocess, warnings
+import os, sys, re, json, glob, random, subprocess, warnings, ssl, shutil, urllib.request
 import numpy as np, pandas as pd
 import cv2, librosa, torch, torch.nn as nn
 import matplotlib.pyplot as plt, seaborn as sns
 from tqdm.auto import tqdm
+import imageio_ffmpeg
+from IPython.display import display
 warnings.filterwarnings('ignore')
 
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-print('Device:', DEVICE)
+IN_COLAB = 'google.colab' in sys.modules
+DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
+FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()          # bundled ffmpeg binary: no apt-get / Homebrew needed
+print('Device:', DEVICE, '| Colab:', IN_COLAB)
 
-USE_DRIVE = True
-if USE_DRIVE:
+if IN_COLAB:
     from google.colab import drive
     drive.mount('/content/drive')
-    ROOT = '/content/drive/MyDrive/MM_Project2'
+    ROOT, WORK = '/content/drive/MyDrive/MM_Project2', '/content'          # WORK = fast local disk
 else:
-    ROOT = '/content/MM_Project2'
+    ROOT = os.path.expanduser('~/DSAI413/MM_Project2'); WORK = f'{ROOT}/work'
 DATA, FEAT, RES = f'{ROOT}/data', f'{ROOT}/features', f'{ROOT}/results'
-for d in (DATA, FEAT, RES): os.makedirs(d, exist_ok=True)
+for d in (DATA, FEAT, RES, WORK): os.makedirs(d, exist_ok=True)
 """)
 
 code(r"""
@@ -74,28 +76,48 @@ set_seed(0)
 """)
 
 code(r"""
-# 3) Download UCF101 (~6.5 GB) + official splits  (one-time; stored on Drive)
-os.chdir(DATA)
-if not os.path.exists('UCF101.rar'):
-    !wget -q --show-progress https://www.crcv.ucf.edu/data/UCF101/UCF101.rar || wget -q --show-progress --no-check-certificate https://www.crcv.ucf.edu/data/UCF101/UCF101.rar
-if not os.path.exists('ucfTrainTestlist'):
-    !wget -q https://www.crcv.ucf.edu/data/UCF101/UCF101TrainTestSplits-RecognitionTask.zip || wget -q --no-check-certificate https://www.crcv.ucf.edu/data/UCF101/UCF101TrainTestSplits-RecognitionTask.zip
-    !unzip -q -o UCF101TrainTestSplits-RecognitionTask.zip
-# Extract only candidate classes, to local disk (faster than Drive I/O)
-VID_DIR = '/content/UCF-101'
-for c in CANDIDATES:
-    if not os.path.isdir(f'{VID_DIR}/{c}'):
-        subprocess.run(['unrar','x','-o+','-inul',f'{DATA}/UCF101.rar',f'UCF-101/{c}/*','/content/'], check=False)
+# 3) Download UCF101 (~6.5 GB) + official splits  (one-time)
+def download(url, dst):
+    if os.path.exists(dst): return
+    def fetch(ctx):
+        with urllib.request.urlopen(url, context=ctx) as r, open(dst + '.part', 'wb') as f:
+            total = int(r.headers.get('Content-Length', 0))
+            with tqdm(total=total, unit='B', unit_scale=True, desc=os.path.basename(dst)) as bar:
+                while chunk := r.read(1 << 20):
+                    f.write(chunk); bar.update(len(chunk))
+    try: fetch(None)
+    except (ssl.SSLError, urllib.error.URLError) as e:
+        print('Certificate problem on the UCF server, retrying without verification:', e)
+        fetch(ssl._create_unverified_context())
+    os.replace(dst + '.part', dst)
+
+download('https://www.crcv.ucf.edu/data/UCF101/UCF101.rar', f'{DATA}/UCF101.rar')
+download('https://www.crcv.ucf.edu/data/UCF101/UCF101TrainTestSplits-RecognitionTask.zip', f'{DATA}/splits.zip')
+if not os.path.exists(f'{DATA}/ucfTrainTestlist'):
+    shutil.unpack_archive(f'{DATA}/splits.zip', DATA)
+
+# Extract only the candidate classes, in ONE pass over the archive
+VID_DIR = f'{WORK}/UCF-101'
+todo = [c for c in CANDIDATES if not os.path.isdir(f'{VID_DIR}/{c}')]
+if todo:
+    pats = [f'UCF-101/{c}/*' for c in todo]
+    if IN_COLAB:
+        subprocess.run('apt-get -qq install -y unrar > /dev/null', shell=True)
+        subprocess.run(['unrar', 'x', '-o+', '-inul', f'{DATA}/UCF101.rar', *pats, WORK + '/'], check=False)
+    else:
+        # macOS tar (libarchive) reads RAR archives natively
+        r = subprocess.run(['tar', '-xf', f'{DATA}/UCF101.rar', '-C', WORK, *pats], capture_output=True, text=True)
+        if r.returncode: print(r.stderr[-2000:])
 print({c: len(glob.glob(f'{VID_DIR}/{c}/*.avi')) for c in CANDIDATES})
-# If the UCF server's certificate fails in your region, download UCF101.rar manually, put it in DATA, and re-run.
+# If the download keeps failing: download UCF101.rar in a browser, put it in DATA, and re-run this cell.
+# If extraction fails on a Mac: install Keka or `brew install sevenzip`, extract the listed class folders into VID_DIR manually.
 """)
 
 md("## 4) Select classes by real audio availability")
 code(r"""
 def has_audio(path):
-    r = subprocess.run(['ffprobe','-v','error','-select_streams','a','-show_entries','stream=index',
-                        '-of','csv=p=0',path], capture_output=True, text=True)
-    return r.stdout.strip() != ''
+    r = subprocess.run([FFMPEG, '-hide_banner', '-i', path], capture_output=True, text=True)
+    return 'Audio:' in r.stderr
 
 audio_stats = {}
 for c in tqdm(CANDIDATES):
@@ -204,11 +226,11 @@ print('FV', FV.shape)
 
 md("## 7) Audio branch — MFCC + spectral features")
 code(r"""
-WAV_DIR = '/content/wav'; os.makedirs(WAV_DIR, exist_ok=True)
+WAV_DIR = f'{WORK}/wav'; os.makedirs(WAV_DIR, exist_ok=True)
 def to_wav(path):
     out = f'{WAV_DIR}/{os.path.splitext(os.path.basename(path))[0]}.wav'
     if not os.path.exists(out):
-        subprocess.run(['ffmpeg','-y','-loglevel','error','-i',path,'-vn','-ac','1','-ar',str(SR),out], check=True)
+        subprocess.run([FFMPEG,'-y','-loglevel','error','-i',path,'-vn','-ac','1','-ar',str(SR),out], check=True)
     return out
 
 def stats(m):  # mean and std over time
@@ -245,9 +267,11 @@ tx_fp = f'{FEAT}/transcripts.json'
 transcripts = json.load(open(tx_fp)) if os.path.exists(tx_fp) else {}
 todo = [p for p in df.path if os.path.basename(p) not in transcripts]
 if todo:
-    asr = whisper.load_model(WHISPER_MODEL, device=DEVICE)
+    W_DEV = 'cuda' if DEVICE == 'cuda' else 'cpu'     # Whisper is unreliable on Apple MPS -> CPU on a Mac
+    asr = whisper.load_model(WHISPER_MODEL, device=W_DEV)
     for i, p in enumerate(tqdm(todo, desc='whisper')):
-        r = asr.transcribe(to_wav(p), language='en', fp16=(DEVICE=='cuda'), condition_on_previous_text=False)
+        audio, _ = librosa.load(to_wav(p), sr=16000)       # pass audio directly: Whisper then needs no system ffmpeg
+        r = asr.transcribe(audio.astype(np.float32), language='en', fp16=(W_DEV=='cuda'), condition_on_previous_text=False)
         txt = ' '.join(s['text'].strip() for s in r['segments'] if s['no_speech_prob'] < 0.6).strip()
         transcripts[os.path.basename(p)] = txt
         if i % 50 == 0: json.dump(transcripts, open(tx_fp, 'w'))
